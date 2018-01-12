@@ -5,18 +5,20 @@ import scipy.stats as stats
 class EuropeanOption:
     @staticmethod
     def european_option_value(tau, s0, r, q, vol, strike):
-            if tau < 1e-5:
-                return max(0, s0 - strike)
-            d1 = (np.log(s0 / strike) + (r - q + 0.5 * vol * vol) * tau) / (vol * np.sqrt(tau))
-            d2 = d1 - vol * np.sqrt(tau)
-            return s0 * np.exp(-q * tau) * stats.norm.cdf(d1) \
-                - strike * np.exp(-r * tau) * stats.norm.cdf(d2)
+        """put option"""
+        if tau < 1e-5:
+            return max(0, s0 - strike)
+        d1 = EuropeanOption.d1(tau, s0, r, q, vol, strike)
+        d2 = EuropeanOption.d2(tau, s0, r, q, vol, strike)
+        return strike * np.exp(-r * tau) * stats.norm.cdf(-d2) - s0 * np.exp(-q * tau) * stats.norm.cdf(-d1)
 
     @staticmethod
     def european_option_theta(tau, s0, r, q, vol, strike):
+        """put option theta"""
         d1 = EuropeanOption.d1(tau, s0, r, q, vol, strike)
         d2 = EuropeanOption.d2(tau, s0, r, q, vol, strike)
-        return strike * np.exp(-r * tau) * stats.norm.cdf(-d2) - s0 * np.exp(-q*tau)*stats.norm.cdf(-d1)
+        return r*strike * np.exp(-r * tau) * stats.norm.cdf(-d2) - q * s0 * np.exp(-q * tau)*stats.norm.cdf(-d1) \
+            - vol * s0 * np.exp(-q * tau) * stats.norm.pdf(d1)/(2 * np.sqrt(tau))
 
     @staticmethod
     def d1(tau, s0, r, q, vol, strike):

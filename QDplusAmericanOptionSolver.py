@@ -5,12 +5,11 @@ import EuropeanOptionSolver as europ
 
 class QDplus:
     """QD+ alogrithm for computing approximated american option price"""
-    def __init__(self, riskfree, dividend, volatility, strike, maturity):
+    def __init__(self, riskfree, dividend, volatility, strike):
         self.r = riskfree
         self.q = dividend
         self.sigma = volatility
         self.K = strike
-        self.T = maturity
 
         # miscellaneous with tau only
         self.v_M = 0
@@ -28,8 +27,12 @@ class QDplus:
         self.v_d2 = 0
         self.v_dlogSdh = 0
 
+        self.exercise_boundary = 0
+
     def price(self, tau, S):
-        Sb = self.compute_exercise_boundary(tau)
+        self.exercise_boundary = Sb = self.compute_exercise_boundary(tau)
+        err = self.exercise_boundary_func(Sb, tau)
+        print("err = ", err)
 
         self.compute_miscellaneous(tau, Sb)
         qQD = self.v_qQD
@@ -44,8 +47,8 @@ class QDplus:
     def compute_exercise_boundary(self, tau):
         x0 = np.ndarray(1)
         x0[0] = self.K
-        return scipy.optimize.brentq(self.exercise_boundary_func, a=1e-5, b=2*self.K, args=tau)
-        #return scipy.optimize.root(self.exercise_boundary_func,x0=80, args=(tau,)).x[0]
+        #return scipy.optimize.brentq(self.exercise_boundary_func, a=1e-5, b=2*self.K, args=tau)
+        return scipy.optimize.root(self.exercise_boundary_func,x0=self.K, args=(tau,)).x[0]
 
     def compute_miscellaneous(self, tau, S):
         #order cannot be changed
@@ -69,11 +72,6 @@ class QDplus:
         c = self.v_c
         d1 = self.v_d1
         ans = (1 - np.exp(-self.q * tau) * stats.norm.cdf(-d1)) * S + (qQD + c) * (self.K - S - p)
-
-        ans_1 = (1 - np.exp(-self.q * tau) * stats.norm.cdf(-d1)) * S
-        ans_2 = (qQD + c)
-        ans_3 = (self.K - S - p)
-        print("S = ", S, ", ans = ", ans)
         return ans
 
     def q_QD(self):
