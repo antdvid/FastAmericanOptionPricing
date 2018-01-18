@@ -22,6 +22,7 @@ class ChebyshevInterpolation:
         b2 = 0
 
         for k in range(self.n-1,-1,-1):
+            """To Do: a[k] can be saved for later use, no need to redo for different z"""
             a = self.std_coeff(k, n_y)
             b1, b2 = b0, b1
             b0 = a + 2 * z * b1 - b2

@@ -45,10 +45,9 @@ class QDplus:
         return pS + (self.K - Sb - pSb)/(1 - b * np.square(np.log(S/Sb)) - c * np.log(S/Sb)) * np.power(S/Sb, qQD)
 
     def compute_exercise_boundary(self, tau):
-        x0 = np.ndarray(1)
-        x0[0] = self.K
-        #return scipy.optimize.brentq(self.exercise_boundary_func, a=1e-5, b=2*self.K, args=tau)
-        return scipy.optimize.root(self.exercise_boundary_func,x0=self.K, args=(tau,)).x[0]
+        res = scipy.optimize.root(self.exercise_boundary_func,x0=self.K, args=(tau,))
+        return res.x[0]
+
 
     def compute_miscellaneous(self, tau, S):
         #order cannot be changed
