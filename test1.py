@@ -12,4 +12,5 @@ solver = FastAmericanOptionSolver(r, q, sigma, K, T)
 price = solver.solve(0.0, S)   # t and S
 plt.plot(solver.shared_tau, solver.shared_B, 'o-')
 plt.show()
-print("price = ", price)
+print("european price = ", solver.european_put_price)
+print("price = ", price, "true price = ", 23.22834)

@@ -4,8 +4,8 @@ import ChebyshevInterpolation as intrp
 
 
 def test_func(x):
-    #return np.exp(x)* x
-    return np.cos(x) * 100
+    return np.exp(x)* x
+    #return np.cos(x) * 100
 
 #test convergence of chebyshev interpolation
 res = []

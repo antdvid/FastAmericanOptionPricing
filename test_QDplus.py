@@ -9,7 +9,7 @@ q = 0.12     # dividend yield
 K = 100.0       # strike
 S0 = 80.0      # underlying spot
 sigma = 0.2  # volatility
-tau = 3.0       # maturity
+tau = 1       # maturity
 
 solver = QDplus(r, q, sigma, K)
 print("Ep price = ", EuropeanOption.european_option_value(tau, S0, r, q, sigma, K), "Am price =",
@@ -17,6 +17,7 @@ print("Ep price = ", EuropeanOption.european_option_value(tau, S0, r, q, sigma, 
 S = np.linspace(1, 2*S0, 100)
 plt.plot(S, solver.exercise_boundary_func(S, tau))
 plt.plot([0, 2*S0], [0, 0], 'r--')
+plt.ylim([-2*K, 2 * K])
 plt.ylabel("target function")
 plt.xlabel("S*")
 plt.show()

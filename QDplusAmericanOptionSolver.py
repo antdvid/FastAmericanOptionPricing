@@ -2,6 +2,7 @@ import numpy as np
 import scipy.stats as stats
 import scipy.optimize
 import EuropeanOptionSolver as europ
+import types
 
 class QDplus:
     """QD+ alogrithm for computing approximated american option price"""
@@ -29,7 +30,13 @@ class QDplus:
 
         self.exercise_boundary = 0
 
+        self.tolerance = 1e-10
+
     def price(self, tau, S):
+        if tau == 0:
+            return max(S-self.K, 0.0)
+            self.exercise_boundary = self.K
+
         self.exercise_boundary = Sb = self.compute_exercise_boundary(tau)
         err = self.exercise_boundary_func(Sb, tau)
         print("err = ", err)
@@ -41,10 +48,11 @@ class QDplus:
         pS = europ.EuropeanOption.european_option_value(tau, S, self.r, self.q, self.sigma, self.K)
         pSb = europ.EuropeanOption.european_option_value(tau, Sb, self.r, self.q, self.sigma, self.K)
 
-        print("Sb = ", Sb, ", pS = ", pS, ", pSb = ", pSb)
         return pS + (self.K - Sb - pSb)/(1 - b * np.square(np.log(S/Sb)) - c * np.log(S/Sb)) * np.power(S/Sb, qQD)
 
     def compute_exercise_boundary(self, tau):
+        if 0 <= tau < self.tolerance:
+            return self.K
         res = scipy.optimize.root(self.exercise_boundary_func,x0=self.K, args=(tau,))
         return res.x[0]
 
@@ -64,7 +72,13 @@ class QDplus:
         self.v_c = self.c(tau, S)
         self.v_b = self.b(tau, S)
 
+
     def exercise_boundary_func(self, S, tau):
+        if tau == 0:
+            if type(S) is float:
+                return self.K
+            else:
+                return np.ones(S.size) * self.K
         self.compute_miscellaneous(tau, S)
         qQD = self.v_qQD
         p = self.v_p
