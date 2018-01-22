@@ -16,8 +16,8 @@ class FastAmericanOptionSolver:
         self.sigma = volatility
         self.K = strike
         self.T = maturity
-        self.collocation_num = 15
-        self.quadrature_num = 11
+        self.collocation_num = 12
+        self.quadrature_num = 20
         self.iter_tol = 1e-5
         self.shared_B = []
         self.shared_tau = []
@@ -29,6 +29,7 @@ class FastAmericanOptionSolver:
         self.w = [0.236927, 0.478629,  0, 0.478629, 0.236927]
         self.shared_Bu = [None] * len(self.y)
         self.shared_u = [None] * len(self.y)
+        self.tau_cache = -1
 
         # Debug switch
         self.DEBUG = True
@@ -47,6 +48,15 @@ class FastAmericanOptionSolver:
         self.debug("gaussian weights = {0}".format(self.w))
         ########################################
 
+        ####check gaussian points are done###
+        self.debug("step 3. test numerical integration ...")
+        self.test_numerical_integration()
+
+        self.debug("step 3. check gaussian points ...")
+        self.debug("gaussian point = {0}".format(self.y))
+        self.debug("gaussian weights = {0}".format(self.w))
+        ########################################
+
         self.compute_exercise_boundary()
 
         ##### check exercise boundary ###########
@@ -54,10 +64,26 @@ class FastAmericanOptionSolver:
         self.debug("exercise boundary = {0}".format(self.shared_B))
         ########################################
 
-        v = europ.EuropeanOption.european_option_value(tau, s0, self.r, self.q, self.sigma, self.K)
-        self.european_put_price = v # save european price
+        v = self.american_put_with_known_boundary(tau, s0, self.r, self.q, self.sigma, self.K)
+        return v
+
+    def test_numerical_integration(self):
+        self.set_initial_guess()
+        tau = 3.0
+        s0 = 2
+        analy_res = s0 * 0.5 * (np.exp(tau * tau) - 1)
+        num_res = self.quadrature_sum(self.test_integrand, tau, s0, self.shared_u, self.shared_Bu)
+        print("analytic sol =", analy_res, "numerical sol = ", num_res)
+        #exit()
+
+    def test_integrand(self, tau, S, u, Bu):
+        return S * u * np.exp(u * u)
+
+    def american_put_with_known_boundary(self, tau, s0, r, q, sigma, K):
+        v = europ.EuropeanOption.european_option_value(tau, s0, r, q, sigma, K)
+        self.european_put_price = v  # save european price
         v += self.quadrature_sum(self.v_integrand_1, tau, s0, self.shared_u, self.shared_Bu)
-        v += self.quadrature_sum(self.v_integrand_2, tau, s0, self.shared_u, self.shared_Bu)
+        v -= self.quadrature_sum(self.v_integrand_2, tau, s0, self.shared_u, self.shared_Bu)
         return v
 
     def compute_exercise_boundary(self):
@@ -76,22 +102,27 @@ class FastAmericanOptionSolver:
             iter_count += 1
             B_old = self.shared_B.copy()
             self.shared_B = self.iterate_once(self.shared_tau, B_old)
-            iter_err = self.norm2(B_old, self.shared_B)
-            self.debug("  iter = {0}, err = {1}".format(iter_count, self.norm2(B_old, self.shared_B)))
+            iter_err = self.norm1_error(B_old, self.shared_B)
+            self.debug("  iter = {0}, err = {1}".format(iter_count, self.norm1_error(B_old, self.shared_B)))
+            #self.debug("match condition err1 = {0}".format(self.check_value_match_condition()))
+            #self.debug("match condition err2 = {0}".format(self.check_value_match_condition2()))
 
     def iterate_once(self, tau, B):
         """the for-loop can be parallelized"""
         eta = 1
         B_new = []
+        f_vec = []
+        N_vec = []
+        D_vec = []
         for tau_i, B_i in zip(tau, B):
-            #compute u and Bu for integration
-            self.compute_integration_terms(tau_i)
-
             N = self.N_func(tau_i, B_i)
             D = self.D_func(tau_i, B_i)
             Ndot = self.Nprime_func(tau_i, B_i)
             Ddot = self.Dprime_func(tau_i, B_i)
             f = self.K * np.exp(-tau_i * (self.r - self.q)) * N / D
+            f_vec.append(f)
+            N_vec.append(N)
+            D_vec.append(D)
             fdot = 0
             #fdot = self.K * np.exp(-tau_i * (self.r - self.q)) * (Ndot / D - Ddot * N / (D * D))
             B_i += eta * (B_i - f) / (fdot - 1)
@@ -100,6 +131,10 @@ class FastAmericanOptionSolver:
 
     def compute_integration_terms(self, tau):
         """compute u between 0, tau_i"""
+        if tau == self.tau_cache:
+            return
+        else:
+            self.tau_cache = tau
         N = len(self.y)
         for i in range(N):
             self.shared_u[i] = tau - tau * np.square(1 + self.y[i])/4.0
@@ -131,7 +166,7 @@ class FastAmericanOptionSolver:
             print(message)
             print("")
 
-    def norm2(self, x1, x2):
+    def norm1_error(self, x1, x2):
         x1 = np.array(x1)
         x2 = np.array(x2)
         return alg.norm(np.abs(x1 - x2))
@@ -161,6 +196,10 @@ class FastAmericanOptionSolver:
     def to_orig_point(self, c, x_max):
         return np.square(c + 1) * x_max / 4
 
+    def jac(self, a, b, x):
+        """this function defines transformation jacobian for y = f(x): dy = jac * dx"""
+        return 0.5 * (b - a) * (1 + x)
+
     def set_initial_guess(self):
         """get initial guess for all tau_i using QD+ algorithm"""
         qd_solver = qd.QDplus(self.r, self.q, self.sigma, self.K)
@@ -170,10 +209,14 @@ class FastAmericanOptionSolver:
         self.shared_B = res
 
     def N_func(self, tau, B):
+        if tau == 0:
+            return 1
         return self.CDF_pos_dminus(tau, B/self.K) \
                + self.r * self.quadrature_sum(self.N_integrand, tau, B, self.shared_u, self.shared_Bu)
 
     def D_func(self, tau, B):
+        if tau ==  0:
+            return 1
         return self.CDF_pos_dplus(tau, B/self.K) + \
                self.q * self.quadrature_sum(self.D_integrand, tau, B, self.shared_u, self.shared_Bu)
 
@@ -230,7 +273,7 @@ class FastAmericanOptionSolver:
         if tau == 0:
             return 0
         else:
-            return stats.norm.cdf(self.dplus(tau, z))
+            return stats.norm.cdf(-self.dplus(tau, z))
 
     def CDF_pos_dplus(self, tau, z):
         # phi(+d+)
@@ -261,10 +304,28 @@ class FastAmericanOptionSolver:
         # tau, S are scalar, u and Bu are vectors for integration
         # u, Bu and y, w should have the same number of points
         assert len(u) == len(Bu) and len(u) == len(self.w)
+
+        # important, recalcualte integration points and weights
+        self.compute_integration_terms(tau)
         ans = 0
         for i in range(len(u)):
-            adding = integrand(tau, S, u[i], Bu[i]) * self.w[i]
+            adding = integrand(tau, S, u[i], Bu[i]) * self.w[i] * self.jac(0, tau, self.y[i])
             ans += adding
         return ans
 
+    def check_value_match_condition(self):
+        left = []
+        right = []
+        for tau_i, B_i in zip(self.shared_tau, self.shared_B):
+            left.append(self.K - B_i)
+            right.append(self.american_put_with_known_boundary(tau_i, B_i, self.r, self.q, self.sigma, self.K))
+        return self.norm1_error(left, right)
+
+    def check_value_match_condition2(self):
+        left = []
+        right = []
+        for tau_i, B_i in zip(self.shared_tau, self.shared_B):
+            left.append(self.N_func(tau_i, B_i) * self.K * np.exp(-self.r * tau_i))
+            right.append(self.D_func(tau_i, B_i) * B_i * np.exp(- self.q * tau_i))
+        return self.norm1_error(left, right)
 

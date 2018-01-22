@@ -23,10 +23,8 @@ class EuropeanOption:
 
     @staticmethod
     def d1(tau, s0, r, q, vol, strike):
-        tau = max(tau, 1e-10)
         return np.log(s0 * np.exp((r-q)*tau)/strike)/(vol * np.sqrt(tau)) + 0.5*vol * np.sqrt(tau)
 
     @staticmethod
     def d2(tau, s0, r, q, vol, strike):
-        tau = max(tau, 1e-10)
         return EuropeanOption.d1(tau, s0, r, q, vol, strike) - vol * np.sqrt(tau)
