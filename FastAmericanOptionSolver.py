@@ -43,25 +43,22 @@ class FastAmericanOptionSolver:
         ########################################
         self.set_gaussian_quadrature()
         ####check gaussian points are done###
-        self.debug("step 2. checking collocation points ...")
+        self.debug("step 2. checking Gaussian points ...")
         self.debug("gaussian point = {0}".format(self.y))
         self.debug("gaussian weights = {0}".format(self.w))
         ########################################
 
         ####check gaussian points are done###
-        self.debug("step 3. test numerical integration ...")
+        self.debug("step 3. checking numerical integration ...")
         self.test_numerical_integration()
-
-        self.debug("step 3. check gaussian points ...")
-        self.debug("gaussian point = {0}".format(self.y))
-        self.debug("gaussian weights = {0}".format(self.w))
         ########################################
 
         self.compute_exercise_boundary()
 
         ##### check exercise boundary ###########
-        self.debug("step 5. checking exercise boundary ...")
+        self.debug("step 6. checking exercise boundary ...")
         self.debug("exercise boundary = {0}".format(self.shared_B))
+        self.debug("match condition err = {0}".format(self.check_value_match_condition2()))
         ########################################
 
         v = self.american_put_with_known_boundary(tau, s0, self.r, self.q, self.sigma, self.K)
@@ -73,7 +70,7 @@ class FastAmericanOptionSolver:
         s0 = 2
         analy_res = s0 * 0.5 * (np.exp(tau * tau) - 1)
         num_res = self.quadrature_sum(self.test_integrand, tau, s0, self.shared_u, self.shared_Bu)
-        print("analytic sol =", analy_res, "numerical sol = ", num_res)
+        self.debug("analytical sol = {0}, numerical sol = {1}, err = {2}".format(analy_res, num_res, abs(analy_res - num_res)))
         #exit()
 
     def test_integrand(self, tau, S, u, Bu):
@@ -89,12 +86,12 @@ class FastAmericanOptionSolver:
     def compute_exercise_boundary(self):
         self.set_initial_guess()
         ##################################
-        self.debug("step 3. checking QD+ alogrithm ...")
+        self.debug("step 4. checking QD+ alogrithm ...")
         self.debug("B guess = {0}".format(self.shared_B))
         ##################################
 
         ##################################
-        self.debug("step 4. starting iteration ...")
+        self.debug("step 5. starting iteration ...")
         ##################################
         iter_count = 0
         iter_err = 1
