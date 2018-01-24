@@ -15,6 +15,7 @@ class EuropeanOption:
     @staticmethod
     def european_option_theta(tau, s0, r, q, vol, strike):
         """put option theta"""
+        r = max(r, 1e-10)
         tau = max(tau, 1e-10) # set tau negative
         d1 = EuropeanOption.d1(tau, s0, r, q, vol, strike)
         d2 = EuropeanOption.d2(tau, s0, r, q, vol, strike)
