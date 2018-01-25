@@ -1,4 +1,4 @@
-from FastAmericanOptionSolver import *
+from FastAmericanOptionSolverA import *
 
 # unit test one for valuing American option
 r = 0.04      # risk free
@@ -8,7 +8,7 @@ S = 80        # underlying spot
 sigma = 0.2  # volatility
 T = 3.0         # maturity
 
-solver = FastAmericanOptionSolver(r, q, sigma, K, T)
+solver = FastAmericanOptionSolverA(r, q, sigma, K, T)
 price = solver.solve(0.0, S)   # t and S
 print("european price = ", solver.european_put_price, "true price = ", 22.0142)
 print("price = ", price, "true price = ", 23.22834)
