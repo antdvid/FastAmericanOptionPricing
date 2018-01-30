@@ -4,14 +4,8 @@ import ChebyshevInterpolation as intrp
 import EuropeanOptionSolver as europ
 import QDplusAmericanOptionSolver as qd
 import numpy.linalg as alg
-import math
-import matplotlib.pyplot as plt
 import numpy.polynomial.legendre as legendre
-
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
 
 
 class FastAmericanOptionSolver:
@@ -44,6 +38,7 @@ class FastAmericanOptionSolver:
 
         # Debug switch
         self.DEBUG = True
+        self.use_derivative = False
 
     def solve(self, t, s0):
         tau = self.T - t
@@ -92,6 +87,7 @@ class FastAmericanOptionSolver:
         ##################################
         self.debug("step 4. checking QD+ alogrithm ...")
         self.debug("B guess = {0}".format(self.shared_B))
+        self.debug("tau  = {0}".format(self.shared_tau))
         ##################################
 
         ##################################
@@ -120,20 +116,21 @@ class FastAmericanOptionSolver:
             B_i = B[i]
             f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
             f = f_and_fprime[0]
-            if len(self.shared_B_old) != 0:
-                num_fprime = self.compute_fprime_numerical(tau_i, B_i, self.shared_B_old[i])
-            else:
-                num_fprime = f_and_fprime[1]
+            # if len(self.shared_B_old) != 0:
+            #     num_fprime = self.compute_fprime_numerical(tau_i, B_i, self.shared_B_old[i])
+            # else:
+            #     num_fprime = f_and_fprime[1]
 
             ####
-            #fprime = f_and_fprime[1]
-            fprime = 0.0
-            #fprime = num_fprime
+            if self.use_derivative:
+                fprime = f_and_fprime[1]
+            else:
+                fprime = 0.0
 
             ###
-            print("tau_i = ", tau_i, "analy fprime = ", f_and_fprime[1], "numr fprime = ", num_fprime)
+            # print("tau_i = ", tau_i, "analy fprime = ", f_and_fprime[1], "numr fprime = ", num_fprime)
             if tau_i == 0:
-                B_i = self.K
+                B_i = min(self.K, self.K * self.r / self.q)
             else:
                 B_i += eta * (B_i - f)/(fprime - 1)
 
@@ -221,14 +218,12 @@ class FastAmericanOptionSolver:
         return (f_up - f_down)/(B_i - B_i_old)
 
     def N_func(self, tau, B):
-        if tau == 0:
-            return 1
+        tau = max(1e-10, tau)
         return self.CDF_pos_dminus(tau, B/self.K) \
                + self.r * self.quadrature_sum(self.N_integrand, tau, B, self.quadrature_num)
 
     def D_func(self, tau, B):
-        if tau ==  0:
-            return 1
+        tau = max(1e-10, tau)
         return self.CDF_pos_dplus(tau, B/self.K) + \
                self.q * self.quadrature_sum(self.D_integrand, tau, B, self.quadrature_num)
 

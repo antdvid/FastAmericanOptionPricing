@@ -2,7 +2,7 @@ from FastAmericanOptionSolverB import *
 
 # unit test one for valuing American option
 r = 0.04      # risk free
-q = 0.04      # dividend yield
+q = 0.05      # dividend yield
 K = 100       # strike
 S = 80        # underlying spot
 sigma = 0.2  # volatility
@@ -15,7 +15,7 @@ print("price = ", price, "true price = ", 23.22834)
 
 #make a plot for exercise boundary
 plt.plot(solver.shared_tau, solver.shared_B, 'o-')
-plt.plot(solver.shared_tau, solver.shared_B0, 'r--')
+plt.plot(solver.shared_tau, solver.shared_B0, '*-')
 plt.legend(["real exercise boundary", "initial guess"])
 plt.xlabel("Time to maturity tau")
 plt.ylabel("Exercise boundary [$]")

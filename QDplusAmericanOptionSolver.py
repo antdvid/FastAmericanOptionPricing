@@ -51,9 +51,10 @@ class QDplus:
         return pS + (self.K - Sb - pSb)/(1 - b * np.square(np.log(S/Sb)) - c * np.log(S/Sb)) * np.power(S/Sb, qQD)
 
     def compute_exercise_boundary(self, tau):
-        if 0 <= tau < self.tolerance:
-            return self.K
-        res = scipy.optimize.root(self.exercise_boundary_func,x0=self.K, args=(tau,))
+        if -self.tolerance < tau < self.tolerance:
+            return min(self.K, self.K * self.r / self.q)
+        # using x0->0 is critical since there are multiple roots for the target function
+        res = scipy.optimize.root(self.exercise_boundary_func,x0=0.001, args=(tau,))
         return res.x[0]
 
 
