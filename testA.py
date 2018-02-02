@@ -2,7 +2,7 @@ from FastAmericanOptionSolverA import *
 
 # unit test one for valuing American option
 r = 0.04      # risk free
-q = 0.05      # dividend yield
+q = 0.04      # dividend yield
 K = 100       # strike
 S = 80        # underlying spot
 sigma = 0.2  # volatility
@@ -28,3 +28,6 @@ plt.loglog(iters, errors, 'o-')
 plt.xlabel("Number of iterations")
 plt.ylabel("Match condition error")
 plt.show()
+
+plt.figure(3)
+solver.check_f_with_B()

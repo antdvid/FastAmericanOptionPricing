@@ -35,6 +35,8 @@ class FastAmericanOptionSolver:
         self.integration_num_cache = -1
 
         self.iter_records = []
+        self.error = 1000000
+        self.num_iters = 0
 
         # Debug switch
         self.DEBUG = True
@@ -65,6 +67,8 @@ class FastAmericanOptionSolver:
         return v
 
     def test_numerical_integration(self):
+        if not self.DEBUG:
+            return
         self.set_initial_guess()
         tau = 3.0
         s0 = 2
@@ -78,6 +82,7 @@ class FastAmericanOptionSolver:
     def american_put_with_known_boundary(self, tau, s0, r, q, sigma, K):
         v = europ.EuropeanOption.european_option_value(tau, s0, r, q, sigma, K)
         self.european_put_price = v  # save european price
+
         v += self.quadrature_sum(self.v_integrand_1, tau, s0, self.integration_num)
         v -= self.quadrature_sum(self.v_integrand_2, tau, s0, self.integration_num)
         return v
@@ -98,29 +103,34 @@ class FastAmericanOptionSolver:
         while iter_err > self.iter_tol:
             iter_count += 1
             B_old = self.shared_B.copy()
+
             self.shared_B = self.iterate_once(self.shared_tau, B_old)
             self.shared_B_old = B_old
             iter_err = self.norm1_error(B_old, self.shared_B)
             self.debug("  iter = {0}, err = {1}".format(iter_count, self.norm1_error(B_old, self.shared_B)))
-            #self.debug("match condition err1 = {0}".format(self.check_value_match_condition()))
-            #self.debug("match condition err2 = {0}".format(self.check_value_match_condition2()))
+            # self.debug("match condition err1 = {0}".format(self.check_value_match_condition1()))
+            # self.debug("match condition err2 = {0}".format(self.check_value_match_condition2()))
+            # self.debug("match condition err3 = {0}".format(self.check_value_match_condition3()))
             self.iter_records.append((iter_count, self.check_value_match_condition2()))
+
+        self.error = self.check_value_match_condition1()
+        self.num_iters = iter_count
 
     def iterate_once(self, tau, B):
         """the for-loop can be parallelized"""
         eta = 1.0
         B_new = []
-        #self.check_f_with_B()
         for i in range(len(tau)):
             tau_i = tau[i]
             B_i = B[i]
+
             f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
             f = f_and_fprime[0]
+
             # if len(self.shared_B_old) != 0:
             #     num_fprime = self.compute_fprime_numerical(tau_i, B_i, self.shared_B_old[i])
             # else:
             #     num_fprime = f_and_fprime[1]
-
             ####
             if self.use_derivative:
                 fprime = f_and_fprime[1]
@@ -199,13 +209,15 @@ class FastAmericanOptionSolver:
 
     def compute_f_and_fprime(self, tau_i, B_i):
         if tau_i == 0:
-            return [self.K, 0]
+            return [min(self.K, self.K * self.r / self.q), 1.0]
         N = self.N_func(tau_i, B_i)
         D = self.D_func(tau_i, B_i)
-        Ndot = self.Nprime_func(tau_i, B_i)
-        Ddot = self.Dprime_func(tau_i, B_i)
         f = self.K * np.exp(-tau_i * (self.r - self.q)) * N / D
-        fprime = self.K * np.exp(-tau_i * (self.r - self.q)) * (Ndot / D - Ddot * N / (D * D))
+        fprime = 1
+        if self.use_derivative:
+            Ndot = self.Nprime_func(tau_i, B_i)
+            Ddot = self.Dprime_func(tau_i, B_i)
+            fprime = self.K * np.exp(-tau_i * (self.r - self.q)) * (Ndot / D - Ddot * N / (D * D))
         return [f, fprime]
 
     def compute_fprime_numerical(self, tau_i, B_i, B_i_old):
@@ -315,8 +327,8 @@ class FastAmericanOptionSolver:
         # tau, S are scalar, u and Bu are vectors for integration
         # u, Bu and y, w should have the same number of points
 
-        # important, recalcualte integration points and weights
         self.compute_integration_terms(tau, num_points)
+
         u = self.shared_u
         Bu = self.shared_Bu
 
@@ -329,7 +341,7 @@ class FastAmericanOptionSolver:
             ans += adding
         return ans
 
-    def check_value_match_condition(self):
+    def check_value_match_condition1(self):
         left = []
         right = []
         for tau_i, B_i in zip(self.shared_tau, self.shared_B):
@@ -345,18 +357,25 @@ class FastAmericanOptionSolver:
             right.append(self.D_func(tau_i, B_i) * B_i * np.exp(- self.q * tau_i))
         return self.norm1_error(left, right)
 
+    def check_value_match_condition3(self):
+        left = []
+        right = []
+        for tau_i, B_i in zip(self.shared_tau, self.shared_B):
+            left.append(B_i)
+            f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
+            right.append(f_and_fprime[0])
+        return self.norm1_error(left, right)
+
     def check_f_with_B(self):
-        N = 20
-        tau = 0.5
+        N = 30
+        tau = 0.2
         B = np.linspace(50, 100, N)
         fprime = []
         f = []
-        for Bi in B:
+        for Bi  in B:
             res = self.compute_f_and_fprime(tau, Bi)
             fprime.append(res[1])
             f.append(res[0])
-
-        print(fprime)
 
         plt.subplot(1,2,1)
         plt.plot(B, f, 'o-')
@@ -367,5 +386,4 @@ class FastAmericanOptionSolver:
         plt.xlabel("B")
         plt.ylabel("f prime")
         plt.show()
-
         exit()

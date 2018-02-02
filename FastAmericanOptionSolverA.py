@@ -49,14 +49,13 @@ class FastAmericanOptionSolverA(FastAmericanOptionSolver):
         #K_star = self.K * np.exp(-(self.r - self.q) * tau)
         #return -K_star/Q * self.dminus(tau, Q/self.K)*self.PDF_dminus(tau, Q/self.K)/(Q * self.sigma * self.sigma * tau) \
         #       - self.q * K_star/Q * self.quadrature_sum(self.Dprime_integrand, tau, Q, self.quadrature_num)
-        return -self.dplus(tau, Q/self.K) * self.PDF_dplus(tau, Q/self.K) /(self.sigma * self.sigma * tau * Q) \
-            + self.PDF_dplus(tau, Q/self.K)/(self.sigma * Q * np.sqrt(tau))\
-            + self.q * self.quadrature_sum(self.Dprime_integrand, tau, Q, self.quadrature_num)
+        return self.PDF_dplus(tau, Q/self.K)/(self.sigma * np.sqrt(tau) * Q) \
+               * (1 - self.dplus(tau, Q/self.K)/(self.sigma * np.sqrt(tau))) \
+               + self.q * self.quadrature_sum(self.Dprime_integrand, tau, Q, self.quadrature_num)
 
     def Dprime_integrand(self, tau, B_tau, u, B_u):
         tau = max(1e-10, tau)
         #return B_u/self.K * np.exp(self.r * u) * self.dminus(tau-u, B_tau/B_u)/(self.sigma * self.sigma * (tau - u)) \
         #       * self.PDF_dminus(tau-u, B_tau/B_u)
         return np.exp(self.q * u) * self.PDF_dplus(tau-u, B_tau/B_u)/(self.sigma * np.sqrt(tau - u) * B_tau) \
-            - (np.exp(self.q * u) * self.dplus(tau-u, B_tau/B_u) * self.PDF_dplus(tau-u, B_tau/B_u))\
-              /(self.sigma * self.sigma * (tau - u) * B_tau)
+            * (1 - self.dplus(tau - u, B_tau/B_u)/(self.sigma * np.sqrt(tau - u)))
