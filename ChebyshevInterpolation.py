@@ -1,31 +1,40 @@
 import numpy as np
 
 class ChebyshevInterpolation:
-    def __init__(self, numpoints):
+    def __init__(self, ynodes, x_to_cheby=None, x_min=None, x_max=None):
+        numpoints = len(ynodes)
         self.n = numpoints-1
+        self.a = [0] * numpoints
+        self.x_to_cheby = x_to_cheby
+        self.x_min = x_min
+        self.x_max = x_max
+        for k in range(numpoints):
+            self.a[k] = self.std_coeff(k, ynodes)
 
-    def get_std_cheby_points(self):
-        i = np.arange(0, self.n+1)
-        return np.cos(i * np.pi/self.n)
+    @staticmethod
+    def get_std_cheby_points(numpoints):
+        i = np.arange(0, numpoints+1)
+        return np.cos(i * np.pi/numpoints)
 
-    def std_cheby_value(self, zv, n_y):
+    def value(self, zv):
         ans = []
-        for z in zv:
-            ans.append(self.std_cheby_single_value(z, n_y))
+        to_cheby = zv
+        if self.x_to_cheby is not None:
+            to_cheby = self.x_to_cheby(zv, self.x_min, self.x_max)
+        for z in to_cheby:
+            ans.append(self.std_cheby_single_value(z))
         return ans
 
-    def std_cheby_single_value(self, z, n_y):
+    def std_cheby_single_value(self, z):
         """z is the point to be valued between [-1, 1], n_y are the function values at Chebyshev points
         Iteration using Clenshaw algorithm"""
-        b0 = self.std_coeff(self.n, n_y) * 0.5
+        b0 = self.a[self.n] * 0.5
         b1 = 0
         b2 = 0
 
-        for k in range(self.n-1,-1,-1):
-            """To Do: a[k] can be saved for later use, no need to redo for different z"""
-            a = self.std_coeff(k, n_y)
+        for k in range(self.n - 1, -1, -1):
             b1, b2 = b0, b1
-            b0 = a + 2 * z * b1 - b2
+            b0 = self.a[k] + 2 * z * b1 - b2
         return 0.5 * (b0 - b2)
 
     def std_coeff(self, k, n_y):

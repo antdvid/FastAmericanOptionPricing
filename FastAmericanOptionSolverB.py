@@ -18,6 +18,7 @@ class FastAmericanOptionSolver:
         self.collocation_num = 12
         self.quadrature_num = 24
         self.integration_num = 2 * self.quadrature_num
+        self.max_iters = 200
         self.iter_tol = 1e-5
         self.shared_B0 = []
         self.shared_B = []
@@ -41,6 +42,9 @@ class FastAmericanOptionSolver:
         # Debug switch
         self.DEBUG = True
         self.use_derivative = False
+
+        # for parallel computing
+        pool = None
 
     def solve(self, t, s0):
         tau = self.T - t
@@ -100,7 +104,7 @@ class FastAmericanOptionSolver:
         ##################################
         iter_count = 0
         iter_err = 1
-        while iter_err > self.iter_tol:
+        while iter_err > self.iter_tol and iter_count < self.max_iters:
             iter_count += 1
             B_old = self.shared_B.copy()
 
@@ -113,39 +117,44 @@ class FastAmericanOptionSolver:
             # self.debug("match condition err3 = {0}".format(self.check_value_match_condition3()))
             self.iter_records.append((iter_count, self.check_value_match_condition2()))
 
-        self.error = self.check_value_match_condition1()
+        self.error = iter_err
         self.num_iters = iter_count
 
     def iterate_once(self, tau, B):
         """the for-loop can be parallelized"""
-        eta = 1.0
         B_new = []
-        for i in range(len(tau)):
-            tau_i = tau[i]
-            B_i = B[i]
+        # for i in range(len(tau)):
+        #     B_i = self.iterate_once_foreach_tau(tau[i], B[i])
+        #     B_new.append(B_i)
 
-            f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
-            f = f_and_fprime[0]
+        #try parallel
+        args = [(tau_i, B_i) for tau_i, B_i in zip(tau, B)]
+        B_new = FastAmericanOptionSolver.pool.starmap(self.iterate_once_foreach_tau, args)
 
-            # if len(self.shared_B_old) != 0:
-            #     num_fprime = self.compute_fprime_numerical(tau_i, B_i, self.shared_B_old[i])
-            # else:
-            #     num_fprime = f_and_fprime[1]
-            ####
-            if self.use_derivative:
-                fprime = f_and_fprime[1]
-            else:
-                fprime = 0.0
-
-            ###
-            # print("tau_i = ", tau_i, "analy fprime = ", f_and_fprime[1], "numr fprime = ", num_fprime)
-            if tau_i == 0:
-                B_i = min(self.K, self.K * self.r / self.q)
-            else:
-                B_i += eta * (B_i - f)/(fprime - 1)
-
-            B_new.append(B_i)
         return B_new
+
+    def iterate_once_foreach_tau(self, tau_i, B_i):
+        eta = 1.0
+        f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
+        f = f_and_fprime[0]
+
+        # if len(self.shared_B_old) != 0:
+        #     num_fprime = self.compute_fprime_numerical(tau_i, B_i, self.shared_B_old[i])
+        # else:
+        #     num_fprime = f_and_fprime[1]
+        ####
+        if self.use_derivative:
+            fprime = f_and_fprime[1]
+        else:
+            fprime = 0.0
+
+        ###
+        # print("tau_i = ", tau_i, "analy fprime = ", f_and_fprime[1], "numr fprime = ", num_fprime)
+        if tau_i == 0:
+            B_i = min(self.K, self.K * self.r / self.q)
+        else:
+            B_i += eta * (B_i - f) / (fprime - 1)
+        return B_i
 
     def compute_integration_terms(self, tau, num_points):
         """compute u between 0, tau_i"""
@@ -161,10 +170,15 @@ class FastAmericanOptionSolver:
         self.shared_Bu = [None] * len(self.y)
         self.shared_u = [None] * len(self.y)
 
-        N = len(self.y)
-        for i in range(N):
-            self.shared_u[i] = tau - tau * np.square(1 + self.y[i])/4.0
-            self.shared_Bu[i] = self.chebyshev_func(self.shared_u[i])
+        X = self.K * min(1, self.r / self.q)
+        # this transformation significantly reduces the number of iterations
+
+        H = np.square(np.log(np.array(self.shared_B) / X))
+        cheby_interp = intrp.ChebyshevInterpolation(H, self.to_cheby_point, 0, self.tau_max)
+        self.shared_u = tau - tau * np.square(1 + self.y)/4.0
+        Bu_intrp = cheby_interp.value(self.shared_u)
+        Bu_intrp = np.exp(-np.sqrt(np.maximum(0.0, Bu_intrp))) * X
+        self.shared_Bu = Bu_intrp
 
     def v_integrand_1(self, tau, S, u, Bu):
         # every input is scalar
@@ -175,8 +189,8 @@ class FastAmericanOptionSolver:
         return self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_neg_dplus(tau-u, S/Bu)
 
     def set_collocation_points(self):
-        cheby_intrp = intrp.ChebyshevInterpolation(self.collocation_num)
-        self.shared_tau = self.to_orig_point(cheby_intrp.get_std_cheby_points(), self.tau_max)
+        cheby_points = intrp.ChebyshevInterpolation.get_std_cheby_points(self.collocation_num)
+        self.shared_tau = self.to_orig_point(cheby_points, self.tau_max)
 
     def debug(self, message):
         if self.DEBUG == True:
@@ -188,8 +202,8 @@ class FastAmericanOptionSolver:
         x2 = np.array(x2)
         return alg.norm(np.abs(x1 - x2))
 
-    def to_cheby_point(self, x, x_max):
-        return np.sqrt(4 * x / x_max) - 1
+    def to_cheby_point(self, x, x_min, x_max):
+        return np.sqrt(4 * x / (x_max - x_min)) - 1
 
     def to_orig_point(self, c, x_max):
         return np.square(c + 1) * x_max / 4
@@ -312,16 +326,6 @@ class FastAmericanOptionSolver:
             return 0
         else:
             return stats.norm.pdf(self.dplus(tau, z))
-
-    def chebyshev_func(self, tau):
-        cheby_interp = intrp.ChebyshevInterpolation(self.collocation_num)
-        to_cheby_point = self.to_cheby_point(tau, self.tau_max)
-        X = self.K * min(1, self.r/self.q)
-        #this transformation significantly reduces the number of iterations
-        H = np.square(np.log(np.array(self.shared_B) / X))
-        ans = cheby_interp.std_cheby_value([to_cheby_point], H)[0]
-        ans = np.exp(-np.sqrt(max(0, ans))) * X
-        return ans
 
     def quadrature_sum(self, integrand, tau, S, num_points):
         # tau, S are scalar, u and Bu are vectors for integration

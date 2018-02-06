@@ -4,7 +4,7 @@ import ChebyshevInterpolation as intrp
 from random import *
 
 
-def test_func(x):
+def trial_func(x):
     return np.exp(x)* x
 
 
@@ -25,18 +25,17 @@ cheby_point_num = 15
 interval = [0, 3]
 a = interval[0]
 b = interval[1]
-cheby_intrp = intrp.ChebyshevInterpolation(cheby_point_num)
-x = cheby_intrp.get_std_cheby_points()
+x = intrp.ChebyshevInterpolation.get_std_cheby_points(cheby_point_num)
 x = cheby_to_interval(x, a, b)
-y = test_func(x)
+y = trial_func(x)
 perturb(y)
+cheby_intrp = intrp.ChebyshevInterpolation(y, interval_to_cheby, a, b)
 xi = np.linspace(interval[0], interval[1], 100)
-#yi = test_func(xi)
-yintrp = cheby_intrp.std_cheby_value(interval_to_cheby(xi, a, b), y)
+yintrp = cheby_intrp.value(xi)
 plt.plot(x, y, 'o')
 plt.plot(xi, yintrp, '-')
 plt.show()
 
-yintrp = cheby_intrp.std_cheby_value(interval_to_cheby(x, a, b), y)
+yintrp = cheby_intrp.value(x)
 err = np.linalg.norm(np.abs(y - yintrp))
 print("err = ", err)
