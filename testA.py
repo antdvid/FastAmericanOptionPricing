@@ -12,6 +12,7 @@ if __name__ == '__main__':
     T = 3.0         # maturity
 
     solver = FastAmericanOptionSolverA(r, q, sigma, K, T)
+    solver.iter_tol = 1e-3
     FastAmericanOptionSolver.pool = Pool(8)
     price = solver.solve(0.0, S)   # t and S
     print("european price = ", solver.european_put_price, "true price = ", 22.0142)
