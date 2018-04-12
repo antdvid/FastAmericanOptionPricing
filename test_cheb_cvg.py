@@ -12,12 +12,12 @@ res = []
 for cheby_point_num in range(21):
     if cheby_point_num < 2:
         continue
-    cheby_intrp = intrp.ChebyshevInterpolation(cheby_point_num)
-    x = cheby_intrp.get_std_cheby_points()
+    x = intrp.ChebyshevInterpolation.get_std_cheby_points(cheby_point_num)
     y = test_func(x)
+    cheby_intrp = intrp.ChebyshevInterpolation(y)
     xi = np.linspace(-1, 1, 50)
     yi = test_func(xi)
-    yintrp = cheby_intrp.std_cheby_value(xi, y)
+    yintrp = cheby_intrp.value(xi)
     err = np.linalg.norm(np.abs(yi - yintrp))
     print(cheby_point_num, err)
     res.append((cheby_point_num, err))

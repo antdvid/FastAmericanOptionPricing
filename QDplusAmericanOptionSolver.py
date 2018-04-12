@@ -2,16 +2,25 @@ import numpy as np
 import scipy.stats as stats
 import scipy.optimize
 import EuropeanOptionSolver as europ
-import types
+from enum import Enum
+
+
+class OptionType(Enum):
+    Call = 1
+    Put = 2
 
 class QDplus:
     """QD+ alogrithm for computing approximated american option price"""
-    def __init__(self, riskfree, dividend, volatility, strike):
+    def __init__(self, riskfree, dividend, volatility, strike, option_type):
         self.r = riskfree
         self.q = dividend
         self.sigma = volatility
         self.K = strike
-
+        self.option_type = option_type
+        if option_type == OptionType.Call:
+            self.option_indicator = 1
+        else:
+            self.option_indicator = -1
         # miscellaneous with tau only
         self.v_M = 0
         self.v_N = 0
@@ -34,8 +43,8 @@ class QDplus:
 
     def price(self, tau, S):
         if tau == 0:
-            return max(S-self.K, 0.0)
             self.exercise_boundary = self.K
+            return max(S-self.K, 0.0)
 
         self.exercise_boundary = Sb = self.compute_exercise_boundary(tau)
         err = self.exercise_boundary_func(Sb, tau)
@@ -45,10 +54,17 @@ class QDplus:
         qQD = self.v_qQD
         c = self.v_c
         b = self.v_b
-        pS = europ.EuropeanOption.european_option_value(tau, S, self.r, self.q, self.sigma, self.K)
-        pSb = europ.EuropeanOption.european_option_value(tau, Sb, self.r, self.q, self.sigma, self.K)
+        if self.option_type == OptionType.Put:
+            pS = europ.EuropeanOption.european_put_value(tau, S, self.r, self.q, self.sigma, self.K)
+            pSb = europ.EuropeanOption.european_put_value(tau, Sb, self.r, self.q, self.sigma, self.K)
+        else:
+            pS = europ.EuropeanOption.european_call_value(tau, S, self.r, self.q, self.sigma, self.K)
+            pSb = europ.EuropeanOption.european_call_value(tau, Sb, self.r, self.q, self.sigma, self.K)
 
-        return pS + (self.K - Sb - pSb)/(1 - b * np.square(np.log(S/Sb)) - c * np.log(S/Sb)) * np.power(S/Sb, qQD)
+        if self.option_indicator * (Sb - S) <= 0:
+            return self.option_indicator * (S - self.K)
+        else:
+            return pS + (self.K - Sb - pSb)/(1 - b * np.square(np.log(S/Sb)) - c * np.log(S/Sb)) * np.power(S/Sb, qQD)
 
     def compute_exercise_boundary(self, tau):
         if -self.tolerance < tau < self.tolerance:
@@ -63,14 +79,18 @@ class QDplus:
         self.v_N = self.N()
         self.v_M = self.M()
         self.v_h = self.h(tau)
-        self.v_qQD = self.q_QD()
+        self.v_qQD = self.q_QD(tau)
         self.v_qQDdot = self.q_QD_dot()
         self.v_d1 = europ.EuropeanOption.d1(tau, S, self.r, self.q, self.sigma, self.K)
         self.v_d2 = europ.EuropeanOption.d2(tau, S, self.r, self.q, self.sigma, self.K)
-        self.v_p = europ.EuropeanOption.european_option_value(tau, S, self.r, self.q, self.sigma, self.K)
+        if self.option_type == OptionType.Put:
+            self.v_p = europ.EuropeanOption.european_put_value(tau, S, self.r, self.q, self.sigma, self.K)
+        else:
+            self.v_p = europ.EuropeanOption.european_call_value(tau, S, self.r, self.q, self.sigma, self.K)
         self.v_theta = europ.EuropeanOption.european_option_theta(tau, S, self.r, self.q, self.sigma, self.K)
         self.v_dlogSdh = self.dlogSdh(tau, S)
         self.v_c = self.c(tau, S)
+        self.v_c0 = self.c0(tau, S)
         self.v_b = self.b(tau, S)
 
 
@@ -83,16 +103,22 @@ class QDplus:
         self.compute_miscellaneous(tau, S)
         qQD = self.v_qQD
         p = self.v_p
-        c = self.v_c
+        c0 = self.v_c0
         d1 = self.v_d1
-        ans = (1 - np.exp(-self.q * tau) * stats.norm.cdf(-d1)) * S + (qQD + c) * (self.K - S - p)
+        if self.option_type == OptionType.Call:
+            ans = (1 - np.exp(-self.q * tau) * stats.norm.cdf(d1)) * S - (qQD) * (S - self.K - p)
+        else:
+            ans = (1 - np.exp(-self.q * tau) * stats.norm.cdf(-d1)) * S + (qQD) * (self.K - S - p)
         return ans
 
-    def q_QD(self):
+    def q_QD(self, tau):
         N = self.v_N
         M = self.v_M
         h = self.v_h
-        return -0.5*(N-1) - 0.5 * np.sqrt((N-1)*(N-1) + 4 * M/h)
+        if self.option_type == OptionType.Call:
+            return -0.5*(N-1) + 0.5 * np.sqrt((N-1)*(N-1) + 4 * M/h)
+        else:
+            return -0.5*(N-1) - 0.5 * np.sqrt((N-1)*(N-1) + 4 * M/h)
 
     def q_QD_dot(self):
         N = self.v_N

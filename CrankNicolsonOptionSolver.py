@@ -106,6 +106,7 @@ class CNOptionSolver:
     def applyConstraint(self):
         self.X = np.maximum(self.X, self.K - self.S)
 
+
 if __name__ == '__main__':
     # unit test one for valuing American option
     r = 0.04  # risk free

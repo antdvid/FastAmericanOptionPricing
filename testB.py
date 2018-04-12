@@ -7,14 +7,18 @@ K = 100       # strike
 S = 80        # underlying spot
 sigma = 0.2  # volatility
 T = 3.0         # maturity
+option_type = qd.OptionType.Call
 
-solver = FastAmericanOptionSolver(r, q, sigma, K, T)
+solver = FastAmericanOptionSolverB(r, q, sigma, K, T, option_type)
 solver.use_derivative = False
-solver.DEBUG = False
+solver.DEBUG = True
+solver.max_iters = 0
 price = solver.solve(0.0, S)   # t and S
-print("european price = ", solver.european_put_price, "true price = ", 22.0142)
+print("european price = ", solver.european_price, "true price = ", 22.0142)
 print("price = ", price, "true price = ", 23.22834)
-print("error = ", solver.error)
+
+print("european call price = ", solver.european_price, "true price = ", 4.2758)
+print("american call price = ", price, "true price = ", 4.3948)
 
 #make a plot for exercise boundary
 plt.plot(solver.shared_tau, solver.shared_B, 'o-')
