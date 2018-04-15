@@ -12,7 +12,7 @@ option_type = qd.OptionType.Call
 solver = FastAmericanOptionSolverB(r, q, sigma, K, T, option_type)
 solver.use_derivative = False
 solver.DEBUG = True
-solver.max_iters = 0
+solver.max_iters = 200
 price = solver.solve(0.0, S)   # t and S
 print("european price = ", solver.european_price, "true price = ", 22.0142)
 print("price = ", price, "true price = ", 23.22834)

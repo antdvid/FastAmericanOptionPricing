@@ -13,8 +13,9 @@ if __name__ == '__main__':
     option_type = qd.OptionType.Call
 
     solver = FastAmericanOptionSolverA(r, q, sigma, K, T, option_type)
+    solver.use_derivative = True
     solver.iter_tol = 1e-3
-    solver.max_iters = 50
+    solver.max_iters = 10
     price = solver.solve(0.0, S)   # t and S
     print("european put price = ", solver.european_price, "true price = ", 22.0142)
     print("american put price = ", price, "true price = ", 23.22834)
@@ -39,4 +40,4 @@ if __name__ == '__main__':
     plt.show()
 
     plt.figure(3)
-    solver.check_f_with_B()
+    solver.check_f_with_B(np.linspace(100, 500, 200))

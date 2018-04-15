@@ -91,15 +91,14 @@ class FastAmericanOptionSolver(ABC):
 
         self.european_price = v  # save european price
 
-        v += self.quadrature_sum(self.v_integrand_1, tau, s0, self.integration_num)
-        v -= self.quadrature_sum(self.v_integrand_2, tau, s0, self.integration_num)
-        return v
+        # v1 = self.quadrature_sum(self.v_integrand_1, tau, s0, self.integration_num)
+        # v2 = self.quadrature_sum(self.v_integrand_2, tau, s0, self.integration_num)
+        v12 = self.quadrature_sum(self.v_integrand_12, tau, s0, self.integration_num)
+        return v + v12
 
     def compute_exercise_boundary(self):
         self.set_initial_guess()
 
-        if self.option_type == qd.OptionType.Call:
-            self.r, self.q = self.q, self.r
         ##################################
         self.debug("step 4. checking QD+ alogrithm ...")
         self.debug("B guess = {0}".format(self.shared_B))
@@ -119,10 +118,10 @@ class FastAmericanOptionSolver(ABC):
             self.shared_B_old = B_old
             iter_err = self.norm1_error(B_old, self.shared_B)
             self.debug("  iter = {0}, err = {1}".format(iter_count, self.norm1_error(B_old, self.shared_B)))
-            # self.debug("match condition err1 = {0}".format(self.check_value_match_condition1()))
-            # self.debug("match condition err2 = {0}".format(self.check_value_match_condition2()))
-            # self.debug("match condition err3 = {0}".format(self.check_value_match_condition3()))
-            self.iter_records.append((iter_count, self.check_value_match_condition2()))
+            #self.debug("match condition err1 = {0}".format(self.check_value_match_condition1()))
+            self.debug("match condition err2 = {0}".format(self.check_value_match_condition2()))
+            self.debug("match condition err3 = {0}".format(self.check_value_match_condition3()))
+            self.iter_records.append((iter_count, iter_err))
 
         self.error = iter_err
         self.num_iters = iter_count
@@ -137,7 +136,7 @@ class FastAmericanOptionSolver(ABC):
         return B_new
 
     def iterate_once_foreach_tau(self, tau_i, B_i):
-        eta = 1.0
+        eta = 0.5
         f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
         f = f_and_fprime[0]
 
@@ -173,7 +172,10 @@ class FastAmericanOptionSolver(ABC):
         self.shared_Bu = [None] * len(self.y)
         self.shared_u = [None] * len(self.y)
 
-        X = self.K * min(1, self.r / self.q)
+        if self.q > 0:
+            X = self.K * min(1, self.r / self.q)
+        else:
+            X = self.K
         # this transformation significantly reduces the number of iterations
 
         H = np.square(np.log(np.array(self.shared_B) / X))
@@ -196,6 +198,15 @@ class FastAmericanOptionSolver(ABC):
             return self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_neg_dplus(tau-u, S/Bu)
         else:
             return self.r * self.K * np.exp(-self.r * (tau - u)) * self.CDF_pos_dminus(tau - u, S / Bu)
+
+    def v_integrand_12(self, tau, S, u, Bu):
+        # every input is scalar
+        if self.option_type == qd.OptionType.Put:
+            return self.r * self.K * np.exp(-self.r * (tau - u)) * self.CDF_neg_dminus(tau - u, S / Bu) \
+                   - self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_neg_dplus(tau-u, S/Bu)
+        else:
+            return self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_pos_dplus(tau - u, S / Bu) \
+                - self.r * self.K * np.exp(-self.r * (tau - u)) * self.CDF_pos_dminus(tau - u, S / Bu)
 
     def set_collocation_points(self):
         cheby_points = intrp.ChebyshevInterpolation.get_std_cheby_points(self.collocation_num)
@@ -231,8 +242,7 @@ class FastAmericanOptionSolver(ABC):
         self.shared_B0 = res.copy()
 
     def compute_f_and_fprime(self, tau_i, B_i):
-        if tau_i == 0:
-            return [min(self.K, self.K * self.r / self.q), 1.0]
+        #return [min(self.K, self.K * self.r / self.q), 1.0]
         N = self.N_func(tau_i, B_i)
         D = self.D_func(tau_i, B_i)
         f = self.K * np.exp(-tau_i * (self.r - self.q)) * N / D
@@ -348,7 +358,10 @@ class FastAmericanOptionSolver(ABC):
         left = []
         right = []
         for tau_i, B_i in zip(self.shared_tau, self.shared_B):
-            left.append(self.K - B_i)
+            if self.option_type == qd.OptionType.Put:
+                left.append(self.K - B_i)
+            else:
+                left.append(B_i - self.K)
             right.append(self.american_value_with_known_boundary(tau_i, B_i, self.r, self.q, self.sigma, self.K))
         return self.norm1_error(left, right)
 
@@ -356,30 +369,37 @@ class FastAmericanOptionSolver(ABC):
         left = []
         right = []
         for tau_i, B_i in zip(self.shared_tau, self.shared_B):
-            left.append(self.N_func(tau_i, B_i) * self.K * np.exp(-self.r * tau_i))
-            right.append(self.D_func(tau_i, B_i) * B_i * np.exp(- self.q * tau_i))
+            N = self.N_func(tau_i, B_i)
+            D = self.D_func(tau_i, B_i)
+            left.append(N * self.K * np.exp(-self.r * tau_i))
+            right.append(D * B_i * np.exp(- self.q * tau_i))
+            #print("1. N = ", N, "D = ", D, "tau = ", tau_i, "B=", B_i, "left = ", left[-1], "right = ", right[-1], "diff = ", np.abs(left[-1]- right[-1]))
         return self.norm1_error(left, right)
 
     def check_value_match_condition3(self):
         left = []
         right = []
         for tau_i, B_i in zip(self.shared_tau, self.shared_B):
-            left.append(B_i)
             f_and_fprime = self.compute_f_and_fprime(tau_i, B_i)
+            N = self.N_func(tau_i, B_i)
+            D = self.D_func(tau_i, B_i)
+            f_and_fprime[0] = self.K * np.exp(-tau_i * (self.r-self.q)) * N/D
             right.append(f_and_fprime[0])
+            left.append(B_i)
+            #print("2. N = ", N, "D = ", D, "tau = ", tau_i, "B=", B_i, "left = ", left[-1], "right = ", right[-1], "diff = ", np.abs(left[-1]- right[-1]))
         return self.norm1_error(left, right)
 
-    def check_f_with_B(self):
-        N = 30
+    def check_f_with_B(self, B=np.linspace(50, 150, 30)):
         tau = 0.2
-        B = np.linspace(50, 100, N)
         fprime = []
         f = []
-        for Bi  in B:
+        for Bi in B:
             res = self.compute_f_and_fprime(tau, Bi)
             fprime.append(res[1])
             f.append(res[0])
 
+        print(f)
+        print(fprime)
         plt.subplot(1,2,1)
         plt.plot(B, f, 'o-')
         plt.xlabel("B")
