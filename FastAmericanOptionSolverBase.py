@@ -26,6 +26,7 @@ class FastAmericanOptionSolver(ABC):
         self.shared_B_old = []
         self.shared_tau = []
         self.tau_max = self.T
+        self.tau_min = 0
         self.european_price = 0
         self.option_type = option_type
 
@@ -46,6 +47,11 @@ class FastAmericanOptionSolver(ABC):
         self.use_derivative = False
 
     def solve(self, t, s0):
+        if self.q == 0 and self.option_type == qd.OptionType.Call:
+            # for american call with no dividends, return european call price
+            self.european_price = europ.EuropeanOption.european_call_value(self.T- t, s0, self.r, self.q, self.sigma, self.K)
+            return self.european_price
+
         tau = self.T - t
         self.set_collocation_points()
         ####check collocation points are done###
@@ -153,7 +159,7 @@ class FastAmericanOptionSolver(ABC):
         ###
         # print("tau_i = ", tau_i, "analy fprime = ", f_and_fprime[1], "numr fprime = ", num_fprime)
         if tau_i == 0:
-            B_i = min(self.K, self.K * self.r / self.q)
+            B_i = self.B_at_zero()
         else:
             B_i += eta * (B_i - f) / (fprime - 1)
         return B_i
@@ -172,13 +178,11 @@ class FastAmericanOptionSolver(ABC):
         self.shared_Bu = [None] * len(self.y)
         self.shared_u = [None] * len(self.y)
 
-        if self.q > 0:
-            X = self.K * min(1, self.r / self.q)
-        else:
-            X = self.K
+        X = self.B_at_zero()
+
         # this transformation significantly reduces the number of iterations
         H = np.square(np.log(np.array(self.shared_B) / X))
-        cheby_interp = intrp.ChebyshevInterpolation(H, self.to_cheby_point, 0, self.tau_max)
+        cheby_interp = intrp.ChebyshevInterpolation(H, self.to_cheby_point, self.tau_min, self.tau_max)
         self.shared_u = tau - tau * np.square(1 + self.y)/4.0
         Bu_intrp = cheby_interp.value(self.shared_u)
 
@@ -216,7 +220,7 @@ class FastAmericanOptionSolver(ABC):
 
     def set_collocation_points(self):
         cheby_points = intrp.ChebyshevInterpolation.get_std_cheby_points(self.collocation_num)
-        self.shared_tau = self.to_orig_point(cheby_points, self.tau_max)
+        self.shared_tau = self.to_orig_point(cheby_points, self.tau_min, self.tau_max)
 
     def debug(self, message):
         if self.DEBUG == True:
@@ -229,14 +233,27 @@ class FastAmericanOptionSolver(ABC):
         return alg.norm(np.abs(x1 - x2))
 
     def to_cheby_point(self, x, x_min, x_max):
-        return np.sqrt(4 * x / (x_max - x_min)) - 1
+        # x in [x_min, x_max] is transformed to [-1, 1]
+        return np.sqrt(4 * (x - x_min) / (x_max - x_min)) - 1
 
-    def to_orig_point(self, c, x_max):
-        return np.square(c + 1) * x_max / 4
+    def to_orig_point(self, c, x_min, x_max):
+        return np.square(c + 1) * (x_max - x_min) / 4 + x_min
 
     def jac(self, a, b, x):
         """this function defines transformation jacobian for y = f(x): dy = jac * dx"""
         return 0.5 * (b - a) * (1 + x)
+
+    def B_at_zero(self):
+        if self.option_type == qd.OptionType.Call:
+            if self.r <= self.q:
+                return self.K
+            else:
+                return self.r/self.q * self.K
+        else:
+            if self.r >= self.q:
+                return self.K
+            else:
+                return self.r/self.q * self.K
 
     def set_initial_guess(self):
         """get initial guess for all tau_i using QD+ algorithm"""
@@ -249,7 +266,7 @@ class FastAmericanOptionSolver(ABC):
 
     def compute_f_and_fprime(self, tau_i, B_i):
         if tau_i == 0:
-            return [min(self.K, self.K * self.r / self.q), 1.0]
+            return [self.B_at_zero(), 1]
 
         N = self.N_func(tau_i, B_i)
         D = self.D_func(tau_i, B_i)
@@ -408,6 +425,8 @@ class FastAmericanOptionSolver(ABC):
         return self.norm1_error(left, right)
 
     def check_f_with_B(self, B=np.linspace(50, 150, 30)):
+        if self.option_type == qd.OptionType.Call and self.q == 0:
+            return
         tau = 0.2
         fprime = []
         f = []
@@ -416,8 +435,6 @@ class FastAmericanOptionSolver(ABC):
             fprime.append(res[1])
             f.append(res[0])
 
-        print(f)
-        print(fprime)
         plt.subplot(1,2,1)
         plt.plot(B, f, 'o-')
         plt.xlabel("B")

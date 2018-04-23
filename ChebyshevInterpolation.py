@@ -1,7 +1,7 @@
 import numpy as np
 
 class ChebyshevInterpolation:
-    def __init__(self, ynodes, x_to_cheby=None, x_min=None, x_max=None):
+    def __init__(self, ynodes, x_to_cheby, x_min, x_max):
         numpoints = len(ynodes)
         self.n = numpoints-1
         self.a = [0] * numpoints

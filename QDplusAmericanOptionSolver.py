@@ -67,12 +67,23 @@ class QDplus:
             return pS + (self.K - Sb - pSb)/(1 - b * np.square(np.log(S/Sb)) - c * np.log(S/Sb)) * np.power(S/Sb, qQD)
 
     def compute_exercise_boundary(self, tau):
-        if -self.tolerance < tau < self.tolerance and self.q > 0:
-            return min(self.K, self.K * self.r / self.q)
+        if tau == 0:
+            return self.B_at_zero()
         # using x0->0 is critical since there are multiple roots for the target function
-        res = scipy.optimize.root(self.exercise_boundary_func,x0=0.001, args=(tau,))
+        res = scipy.optimize.root(self.exercise_boundary_func,x0=150, args=(tau,))
         return res.x[0]
 
+    def B_at_zero(self):
+        if self.option_type == OptionType.Call:
+            if self.r <= self.q:
+                return self.K
+            else:
+                return self.r/self.q * self.K
+        else:
+            if self.r >= self.q:
+                return self.K
+            else:
+                return self.r/self.q * self.K
 
     def compute_miscellaneous(self, tau, S):
         #order cannot be changed
@@ -88,7 +99,7 @@ class QDplus:
         else:
             self.v_p = europ.EuropeanOption.european_call_value(tau, S, self.r, self.q, self.sigma, self.K)
         self.v_theta = europ.EuropeanOption.european_option_theta(tau, S, self.r, self.q, self.sigma, self.K)
-        self.v_dlogSdh = self.dlogSdh(tau, S)
+        #self.v_dlogSdh = self.dlogSdh(tau, S)
         self.v_c = self.c(tau, S)
         self.v_c0 = self.c0(tau, S)
         self.v_b = self.b(tau, S)
@@ -193,7 +204,6 @@ class QDplus:
 
         dFdS = (1 - qQD) * (1 - np.exp(-q * tau) * stats.norm.cdf(-d1)) \
                 + (np.exp(-q * tau) * stats.norm.pdf(d1))/(self.sigma * np.sqrt(tau))
-
         return -dFdh/dFdS
 
     def h(self, tau):

@@ -35,11 +35,13 @@ class FastAmericanOptionSolverA(FastAmericanOptionSolver):
             return self.quadrature_sum(self.K3_integrand, tau, B, self.quadrature_num)
 
     def K3_integrand(self, tau, B_tau, u, B_u):
+        ans = 0
         if self.option_type == qd.OptionType.Put:
-            return np.exp(self.r * u)/(self.sigma * np.sqrt(tau - u)) * self.PDF_dminus(tau-u, B_tau/B_u)
+            ans = np.exp(self.r * u)/(self.sigma * np.sqrt(tau - u)) * self.PDF_dminus(tau-u, B_tau/B_u)
         else:
-            return np.exp(self.r * u) / (self.sigma * np.sqrt(tau - u)) * self.PDF_neg_dminus(tau-u, B_tau/B_u)
+            ans = np.exp(self.r * u) / (self.sigma * np.sqrt(tau - u)) * self.PDF_neg_dminus(tau-u, B_tau/B_u)
             #return np.exp(self.r * u)/(self.sigma * np.sqrt(tau - u)) * self.PDF_dminus(tau-u, B_tau/B_u)
+        return ans
 
     def Nprime_func(self, tau, Q):
         tau = max(1e-10, tau)
