@@ -3,8 +3,6 @@ from FastAmericanOptionSolverBase import *
 
 class FastAmericanOptionSolverA(FastAmericanOptionSolver):
     def N_func(self, tau, B):
-        if tau == 0:
-            return 0
         K3 = self.K3(tau, B)
         if self.option_type == qd.OptionType.Put:
             return self.PDF_dminus(tau, B/self.K)/(self.sigma * np.sqrt(tau)) + self.r * K3
@@ -13,8 +11,6 @@ class FastAmericanOptionSolverA(FastAmericanOptionSolver):
             #return self.PDF_dminus(tau, B/self.K)/ (self.sigma * np.sqrt(tau)) + self.r * K3
 
     def D_func(self, tau, B):
-        if tau == 0:
-            return 0
         K12 = self.K12(tau, B)
         if self.option_type == qd.OptionType.Put:
             return self.PDF_dplus(tau, B/self.K)/(self.sigma * np.sqrt(tau)) + self.CDF_pos_dplus(tau, B/self.K) + self.q * (K12)

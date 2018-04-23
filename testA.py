@@ -4,7 +4,7 @@ from multiprocessing import Pool
 
 if __name__ == '__main__':
     # unit test one for valuing American option
-    r = 0.04      # risk free
+    r = 0.04     # risk free
     q = 0.04      # dividend yield
     K = 100       # strike
     S = 80        # underlying spot
@@ -13,9 +13,9 @@ if __name__ == '__main__':
     option_type = qd.OptionType.Call
 
     solver = FastAmericanOptionSolverA(r, q, sigma, K, T, option_type)
-    solver.use_derivative = True
-    solver.iter_tol = 1e-3
-    solver.max_iters = 10
+    solver.use_derivative = False
+    solver.iter_tol = 1e-5
+    solver.max_iters = 20
     price = solver.solve(0.0, S)   # t and S
     print("european put price = ", solver.european_price, "true price = ", 22.0142)
     print("american put price = ", price, "true price = ", 23.22834)

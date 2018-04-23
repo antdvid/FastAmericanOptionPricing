@@ -120,7 +120,7 @@ class FastAmericanOptionSolver(ABC):
             self.debug("  iter = {0}, err = {1}".format(iter_count, self.norm1_error(B_old, self.shared_B)))
             #self.debug("match condition err1 = {0}".format(self.check_value_match_condition1()))
             self.debug("match condition err2 = {0}".format(self.check_value_match_condition2()))
-            self.debug("match condition err3 = {0}".format(self.check_value_match_condition3()))
+            #self.debug("match condition err3 = {0}".format(self.check_value_match_condition3()))
             self.iter_records.append((iter_count, iter_err))
 
         self.error = iter_err
@@ -177,12 +177,17 @@ class FastAmericanOptionSolver(ABC):
         else:
             X = self.K
         # this transformation significantly reduces the number of iterations
-
         H = np.square(np.log(np.array(self.shared_B) / X))
         cheby_interp = intrp.ChebyshevInterpolation(H, self.to_cheby_point, 0, self.tau_max)
         self.shared_u = tau - tau * np.square(1 + self.y)/4.0
         Bu_intrp = cheby_interp.value(self.shared_u)
-        Bu_intrp = np.exp(-np.sqrt(np.maximum(0.0, Bu_intrp))) * X
+
+        # note sqrt(H) can be positive or negative depending on B > X or B < X
+        if self.option_type == qd.OptionType.Put:
+            Bu_intrp = np.exp(-np.sqrt(np.maximum(0.0, Bu_intrp))) * X
+        else:
+            Bu_intrp = np.exp(np.sqrt(np.maximum(0.0, Bu_intrp))) * X
+
         self.shared_Bu = Bu_intrp
 
     def v_integrand_1(self, tau, S, u, Bu):
@@ -205,8 +210,9 @@ class FastAmericanOptionSolver(ABC):
             return self.r * self.K * np.exp(-self.r * (tau - u)) * self.CDF_neg_dminus(tau - u, S / Bu) \
                    - self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_neg_dplus(tau-u, S/Bu)
         else:
-            return self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_pos_dplus(tau - u, S / Bu) \
+            ans = self.q * S * np.exp(-self.q * (tau - u)) * self.CDF_pos_dplus(tau - u, S / Bu) \
                 - self.r * self.K * np.exp(-self.r * (tau - u)) * self.CDF_pos_dminus(tau - u, S / Bu)
+            return ans
 
     def set_collocation_points(self):
         cheby_points = intrp.ChebyshevInterpolation.get_std_cheby_points(self.collocation_num)
@@ -242,7 +248,9 @@ class FastAmericanOptionSolver(ABC):
         self.shared_B0 = res.copy()
 
     def compute_f_and_fprime(self, tau_i, B_i):
-        #return [min(self.K, self.K * self.r / self.q), 1.0]
+        if tau_i == 0:
+            return [min(self.K, self.K * self.r / self.q), 1.0]
+
         N = self.N_func(tau_i, B_i)
         D = self.D_func(tau_i, B_i)
         f = self.K * np.exp(-tau_i * (self.r - self.q)) * N / D
@@ -286,29 +294,37 @@ class FastAmericanOptionSolver(ABC):
 
     def CDF_neg_dminus(self, tau, z):
         # phi(-d-)
-        if tau == 0:
+        if tau == 0 and z > 1:
             return 0
+        elif tau == 0 and z <= 1:
+            return 1
         else:
             return stats.norm.cdf(-self.dminus(tau, z))
 
     def CDF_pos_dminus(self, tau, z):
         # phi(+d-)
-        if tau == 0:
+        if tau == 0 and z > 1:
             return 1
+        elif tau == 0 and z <= 1:
+            return 0
         else:
             return stats.norm.cdf(self.dminus(tau, z))
 
     def CDF_neg_dplus(self, tau, z):
         # phi(-d+)
-        if tau == 0:
+        if tau == 0 and z > 1:
             return 0
+        elif tau == 0 and z <= 1:
+            return 1
         else:
             return stats.norm.cdf(-self.dplus(tau, z))
 
     def CDF_pos_dplus(self, tau, z):
         # phi(+d+)
-        if tau == 0:
+        if tau == 0 and z > 1:
             return 1
+        elif tau == 0 and z <= 1:
+            return 0
         else:
             return stats.norm.cdf(self.dplus(tau, z))
 
@@ -369,6 +385,8 @@ class FastAmericanOptionSolver(ABC):
         left = []
         right = []
         for tau_i, B_i in zip(self.shared_tau, self.shared_B):
+            if tau_i == 0:
+                continue
             N = self.N_func(tau_i, B_i)
             D = self.D_func(tau_i, B_i)
             left.append(N * self.K * np.exp(-self.r * tau_i))
