@@ -12,15 +12,20 @@ if __name__ == '__main__':
     sigma = 0.2  # volatility
     T = 3  # maturity
     option_type = OptionType.Put
-    tau = 0.000870786986
+
+    tau = [3.00000000e+00,   2.89864827e+00,   2.61153811e+00,   2.18566017e+00,
+             1.68750000e+00,   1.18846904e+00,   7.50000000e-01,   4.12011906e-01,
+             1.87500000e-01,   6.43398282e-02,   1.34618943e-02,   8.70786986e-04,
+             0.00000000e+00]
 
     solver = QDplus(r, q, sigma, K, option_type)
-    print("Am price =", solver.price(tau, S0), "exercise boundary = ", solver.exercise_boundary)
 
-    S = np.linspace(1, 4*S0, 200)
-    plt.plot(S, solver.exercise_boundary_func(S, tau), 'o-')
-    plt.plot([0, 4*S0], [0, 0], 'r--')
-    plt.ylim([-2*K, 2 * K])
-    plt.ylabel("target function")
-    plt.xlabel("S*")
+    B_tau = []
+    for tau_i in tau:
+        exercise_boundary = solver.compute_exercise_boundary(tau_i)
+        B_tau.append(exercise_boundary)
+
+    print("tau = ", tau)
+    print("Btau = ", B_tau)
+    plt.plot(tau, B_tau, 'o-')
     plt.show()

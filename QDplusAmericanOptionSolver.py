@@ -70,7 +70,9 @@ class QDplus:
         if tau == 0:
             return self.B_at_zero()
         # using x0->0 is critical since there are multiple roots for the target function
-        res = scipy.optimize.root(self.exercise_boundary_func,x0=150, args=(tau,))
+        res = scipy.optimize.root(self.exercise_boundary_func,x0=self.K, args=(tau,))
+        #if res.success == False:
+         #   print("succuess? ", res.success, ", ", res.message, ", res = ", res.x)
         return res.x[0]
 
     def B_at_zero(self):
@@ -99,7 +101,7 @@ class QDplus:
         else:
             self.v_p = europ.EuropeanOption.european_call_value(tau, S, self.r, self.q, self.sigma, self.K)
         self.v_theta = europ.EuropeanOption.european_option_theta(tau, S, self.r, self.q, self.sigma, self.K)
-        #self.v_dlogSdh = self.dlogSdh(tau, S)
+        self.v_dlogSdh = self.dlogSdh(tau, S)
         self.v_c = self.c(tau, S)
         self.v_c0 = self.c0(tau, S)
         self.v_b = self.b(tau, S)
@@ -108,9 +110,9 @@ class QDplus:
     def exercise_boundary_func(self, S, tau):
         if tau == 0:
             if type(S) is float:
-                return self.K
+                return 0
             else:
-                return np.ones(S.size) * self.K
+                return np.ones(S.size) * 0
         self.compute_miscellaneous(tau, S)
         qQD = self.v_qQD
         p = self.v_p

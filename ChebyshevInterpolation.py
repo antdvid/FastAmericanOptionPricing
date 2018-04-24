@@ -18,7 +18,10 @@ class ChebyshevInterpolation:
 
     def value(self, zv):
         ans = []
-        to_cheby = zv
+        if zv is float:
+            to_cheby = [zv]
+        else:
+            to_cheby = zv
         if self.x_to_cheby is not None:
             to_cheby = self.x_to_cheby(zv, self.x_min, self.x_max)
         for z in to_cheby:

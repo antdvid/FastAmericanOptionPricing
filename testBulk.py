@@ -7,7 +7,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import math
-from multiprocessing import Pool
+import QDplusAmericanOptionSolver as qd
 
 
 def surface_plot(X,Y,Z,**kwargs):
@@ -24,34 +24,41 @@ def surface_plot(X,Y,Z,**kwargs):
     plt.colorbar(surf)
     plt.show()
 
+
+def random_between(r_min, r_max):
+    return r_min + (r_max - r_min) * np.random.rand()
+
 def test():
     # bulk test, randomly set r and q to see the result
-    K = 100       # strike
-    S = 80        # underlying spot
     sigma = 0.2  # volatility
     T = 3.0         # maturity
 
-    r_max = 0.3
+    r_max = 0.1
     r_min = 0.001
-    q_max = 0.3
-    q_min = 0.001
+    q_max = 0.1
+    q_min = 0.0
+    S_min = 0.1
+    S_max = 200
+    K_min = 50
+    K_max = 150
     Niters = 500
+    option_type = qd.OptionType.Call
     res = []
     count = 0
     total_start_time = time.clock()
     for i in range(Niters):
-        ri = r_min + (r_max - r_min) * np.random.rand()
-        qi = q_min + (q_max - q_min) * np.random.rand()
-        solver = FAOSA.FastAmericanOptionSolverA(ri, qi, sigma, K, T)
-        solver.collocation_num = 16
-        solver.quadrature_num = 16
-        solver.max_iters = 5
-        solver.iter_tol = 1e-7
+        ri = random_between(r_min, r_max)
+        qi = random_between(q_min, q_max)
+        Si = random_between(S_min, S_max)
+        Ki = random_between(K_min, K_max)
+        solver = FAOSA.FastAmericanOptionSolverA(ri, qi, sigma, Ki, T, option_type)
+        solver.max_iters = 15
+        solver.iter_tol = 1e-4
         solver.DEBUG = False
         start = time.clock()
-        price = solver.solve(0.0, S)  # t and S
+        price = solver.solve(0.0, Si)  # t and S
         count += 1
-        print("#", count, "r = ", ri, "q = ", qi, "price = ", price, "error = ", solver.error, "iters = ", solver.num_iters)
+        print("#", count, "r = ", ri, "q = ", qi, "S = ", Si, "K = ", Ki, "price = ", price, "error = ", solver.error, "iters = ", solver.num_iters)
         if math.isnan(price):
             solver.error = 1
 
@@ -65,9 +72,7 @@ if __name__=="__main__":
     #with PyCallGraph(output=GraphvizOutput()):
     #    test()
     np.seterr(all="warn", under="ignore")
-    FAOSA.FastAmericanOptionSolver.pool = Pool(1)
     res = test()
-    exit()
     r = [t[0] for t in res]
     q = [t[1] for t in res]
     error = [t[2] for t in res]

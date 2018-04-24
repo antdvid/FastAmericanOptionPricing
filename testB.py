@@ -14,11 +14,8 @@ solver.use_derivative = False
 solver.DEBUG = True
 solver.max_iters = 20
 price = solver.solve(0.0, S)   # t and S
-print("european price = ", solver.european_price, "true price = ", 22.0142)
-print("price = ", price, "true price = ", 23.22834)
-
-print("european call price = ", solver.european_price, "true price = ", 4.2758)
-print("american call price = ", price, "true price = ", 4.3948)
+print("european price = ", solver.european_price)
+print("american price = ", price)
 
 #make a plot for exercise boundary
 plt.plot(solver.shared_tau, solver.shared_B, 'o-')
@@ -35,6 +32,3 @@ plt.loglog(iters, errors, 'o-')
 plt.xlabel("Number of iterations")
 plt.ylabel("Match condition error")
 plt.show()
-
-plt.figure(3)
-solver.check_f_with_B()

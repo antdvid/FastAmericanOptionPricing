@@ -14,7 +14,7 @@ for cheby_point_num in range(21):
         continue
     x = intrp.ChebyshevInterpolation.get_std_cheby_points(cheby_point_num)
     y = test_func(x)
-    cheby_intrp = intrp.ChebyshevInterpolation(y)
+    cheby_intrp = intrp.ChebyshevInterpolation(y, lambda t, a, b: t, -1, 1)
     xi = np.linspace(-1, 1, 50)
     yi = test_func(xi)
     yintrp = cheby_intrp.value(xi)
