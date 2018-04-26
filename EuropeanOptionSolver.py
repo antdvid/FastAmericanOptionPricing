@@ -16,7 +16,7 @@ class EuropeanOption:
     def european_call_value(tau, s0, r, q, vol, strike):
         """put option"""
         if tau == 0:
-            return max(0, strike - s0)
+            return max(0, s0 - strike)
         d1 = EuropeanOption.d1(tau, s0, r, q, vol, strike)
         d2 = EuropeanOption.d2(tau, s0, r, q, vol, strike)
         return s0 * np.exp(-q * tau) * stats.norm.cdf(d1) - strike * np.exp(-r * tau) * stats.norm.cdf(d2)

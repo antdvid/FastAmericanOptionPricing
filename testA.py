@@ -4,13 +4,13 @@ from multiprocessing import Pool
 
 if __name__ == '__main__':
     # unit test one for valuing American option
-    r = 0.09045314118270259     # risk free
-    q = 0.0005102544435826251      # dividend yield
-    K = 126.67321286836085       # strike
-    S = 173.29713090005612        # underlying spot
+    r = 0.04     # risk free
+    q = 0.01      # dividend yield
+    K = 100.0       # strike
+    S = 80.0        # underlying spot
     sigma = 0.2  # volatility
     T = 3.0         # maturity
-    option_type = qd.OptionType.Call
+    option_type = qd.OptionType.Put
 
     solver = FastAmericanOptionSolverA(r, q, sigma, K, T, option_type)
     solver.use_derivative = False
