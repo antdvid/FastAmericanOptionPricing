@@ -16,4 +16,4 @@ Comparing with the traditional trinomial tree and PDE method, the spectral metho
 <img src="fig/comparison.png">
 
 ## About the paper
-The algorithm is based on paper Leif Andersen, High Performance American Option Pricing, 2015, but the author only considered the put option. Extending to call option is not that straightforward and the call-put symmetry should not be used.I have derived the formula for call option, and is available on request.
+The algorithm is based on paper Leif Andersen, High Performance American Option Pricing, 2015, but the author only considered the put option. The code in this repository has already considered both call and put cases.
